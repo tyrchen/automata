@@ -1,11 +1,13 @@
 //! API server implementation using Axum
 
 use crate::api::handlers::{
-    create_workflow, execute_workflow, get_execution, get_workflow, list_nodes,
+    cancel_execution, create_workflow, delete_workflow, execute_workflow, get_execution,
+    get_execution_logs, get_workflow, list_executions, list_nodes, list_workflows, rerun_execution,
+    update_workflow,
 };
 use crate::core::engine::ExecutionEngine;
 use crate::nodes::NodeRegistry;
-use crate::state::StateManager;
+use crate::state::StateManagerTrait;
 use axum::{
     routing::{get, post},
     Router,
@@ -18,7 +20,7 @@ use tracing::info;
 pub struct ApiServer {
     execution_engine: Arc<ExecutionEngine>,
     node_registry: Arc<NodeRegistry>,
-    state_manager: Arc<StateManager>,
+    state_manager: Arc<dyn StateManagerTrait>,
 }
 
 impl ApiServer {
@@ -26,7 +28,7 @@ impl ApiServer {
     pub fn new(
         execution_engine: Arc<ExecutionEngine>,
         node_registry: Arc<NodeRegistry>,
-        state_manager: Arc<StateManager>,
+        state_manager: Arc<dyn StateManagerTrait>,
     ) -> Self {
         Self {
             execution_engine,
@@ -45,10 +47,25 @@ impl ApiServer {
 
         Router::new()
             .route("/health", get(health_check))
-            .route("/api/v1/workflows", post(create_workflow))
-            .route("/api/v1/workflows/:id", get(get_workflow))
-            .route("/api/v1/workflows/:id/execute", post(execute_workflow))
-            .route("/api/v1/executions/:id", get(get_execution))
+            .route(
+                "/api/v1/workflows",
+                get(list_workflows).post(create_workflow),
+            )
+            .route("/api/v1/workflows/{id}", get(get_workflow))
+            .route(
+                "/api/v1/workflows/{id}",
+                axum::routing::put(update_workflow),
+            )
+            .route(
+                "/api/v1/workflows/{id}",
+                axum::routing::delete(delete_workflow),
+            )
+            .route("/api/v1/workflows/{id}/execute", post(execute_workflow))
+            .route("/api/v1/executions", get(list_executions))
+            .route("/api/v1/executions/{id}", get(get_execution))
+            .route("/api/v1/executions/{id}/logs", get(get_execution_logs))
+            .route("/api/v1/executions/{id}/cancel", post(cancel_execution))
+            .route("/api/v1/executions/{id}/rerun", post(rerun_execution))
             .route("/api/v1/nodes", get(list_nodes))
             .with_state(shared_state)
             .layer(CorsLayer::permissive())

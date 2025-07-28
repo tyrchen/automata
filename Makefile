@@ -1,6 +1,9 @@
 build:
 	@cargo build
 
+run-ui:
+	@cd ui && yarn dev
+
 test:
 	@cargo nextest run --all-features
 

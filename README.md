@@ -360,6 +360,29 @@ Performance targets achieved on AWS c5.large (2 vCPU, 4GB RAM):
 - Redis 6+ for caching and performance
 - Docker (optional) for development environment
 
+### Database Setup
+
+Run the provided SQLx migrations to set up the database schema and demo workflows:
+
+```bash
+# Install SQLx CLI
+cargo install sqlx-cli --no-default-features --features postgres
+
+# Set database URL
+export DATABASE_URL="postgres://username:password@localhost/automata"
+
+# Create database and run migrations
+sqlx database create
+sqlx migrate run
+```
+
+The migrations include:
+- Complete database schema with tables for workflows, executions, logs, and versions
+- 8 comprehensive demo workflows showcasing various patterns and capabilities
+- Sample execution records for testing
+
+See [migrations/README.md](migrations/README.md) for more details about the demo workflows.
+
 ### Building
 
 ```bash

@@ -1,0 +1,126 @@
+# Automata Workflow Engine Configuration
+
+# Server configuration
+server:
+  host: "0.0.0.0"
+  port: 8080
+
+# Database configuration
+database:
+  # PostgreSQL connection URL
+  # Can be overridden by DATABASE_URL environment variable
+  url: "postgres://postgres:password@localhost:5432/automata"
+  # Connection pool settings
+  max_connections: 20
+  min_connections: 5
+  connect_timeout: 30
+  idle_timeout: 600
+  max_lifetime: 1800
+
+# Redis configuration (optional, for caching)
+redis:
+  # Redis connection URL
+  # Can be overridden by REDIS_URL environment variable
+  url: "redis://localhost:6379"
+  # Connection pool settings
+  max_connections: 10
+  min_connections: 2
+  connect_timeout: 10
+
+# Execution engine configuration
+execution:
+  # Maximum number of concurrent workflow executions
+  max_concurrent_executions: 1000
+  # Maximum number of concurrent nodes per workflow
+  max_concurrent_nodes: 100
+  # Default timeout for node execution (seconds)
+  default_node_timeout: 30
+  # Maximum timeout for workflow execution (seconds)
+  max_execution_timeout: 300
+  # Enable execution checkpointing
+  enable_checkpointing: true
+  # Checkpoint interval (seconds)
+  checkpoint_interval: 30
+  # Worker thread pool size (0 = number of CPU cores)
+  worker_threads: 0
+
+# Security configuration
+security:
+  # JWT secret key (should be overridden in production)
+  # Can be overridden by JWT_SECRET environment variable
+  jwt_secret: "your-secret-key-here-change-in-production"
+  # JWT token expiry (seconds)
+  jwt_expiry: 86400
+  # Enable authentication
+  enable_auth: false
+  # CORS allowed origins
+  cors_origins:
+    - "http://localhost:3000"
+    - "http://localhost:5173"
+
+# API configuration
+api:
+  # API base path
+  base_path: "/api/v1"
+  # Request timeout (seconds)
+  request_timeout: 30
+  # Maximum request body size (bytes)
+  max_body_size: 10485760  # 10MB
+  # Enable Swagger UI
+  enable_swagger: true
+  # Swagger UI path
+  swagger_path: "/swagger-ui"
+
+# Logging configuration
+logging:
+  # Log level: trace, debug, info, warn, error
+  level: "info"
+  # Log format: json, pretty
+  format: "pretty"
+  # Enable file logging
+  file_enabled: false
+  # Log file path
+  file_path: "./logs/automata.log"
+  # Log file rotation
+  file_max_size: "100MB"
+  file_max_files: 10
+
+# Node configuration
+nodes:
+  # HTTP node settings
+  http:
+    # Default timeout for HTTP requests (seconds)
+    default_timeout: 30
+    # Maximum redirects
+    max_redirects: 5
+    # User agent
+    user_agent: "Automata/1.0"
+
+  # Database node settings
+  database:
+    # Query timeout (seconds)
+    query_timeout: 30
+    # Enable query logging
+    log_queries: false
+
+# Monitoring configuration
+monitoring:
+  # Enable metrics collection
+  metrics_enabled: true
+  # Metrics endpoint
+  metrics_path: "/metrics"
+  # Enable health check endpoint
+  health_check_enabled: true
+  # Health check path
+  health_check_path: "/health"
+
+# Development settings
+development:
+  # Enable debug mode
+  debug: false
+  # Enable request/response logging
+  log_requests: true
+  # Enable SQL query logging
+  log_sql: false
+  # Mock external services
+  mock_external: false

@@ -19,7 +19,7 @@ pub enum AutomataError {
 
     /// Database errors
     #[error("Database error: {0}")]
-    Database(#[from] sqlx::Error),
+    Database(String),
 
     /// Redis errors
     #[error("Redis error: {0}")]
@@ -40,6 +40,10 @@ pub enum AutomataError {
     /// YAML errors
     #[error("YAML error: {0}")]
     Yaml(#[from] serde_yaml::Error),
+
+    /// Parsing errors
+    #[error("Parsing error: {0}")]
+    Parsing(String),
 
     /// Authentication errors
     #[error("Authentication error: {0}")]
@@ -209,8 +213,7 @@ impl AutomataError {
     pub fn is_transient(&self) -> bool {
         matches!(
             self,
-            AutomataError::Database(sqlx::Error::PoolClosed)
-                | AutomataError::Database(sqlx::Error::PoolTimedOut)
+            AutomataError::Database(_)
                 | AutomataError::Redis(_)
                 | AutomataError::Http(_)
                 | AutomataError::Timeout(_)
@@ -230,6 +233,7 @@ impl AutomataError {
             AutomataError::Io(_) => "IO_ERROR",
             AutomataError::Serialization(_) => "SERIALIZATION_ERROR",
             AutomataError::Yaml(_) => "YAML_ERROR",
+            AutomataError::Parsing(_) => "PARSING_ERROR",
             AutomataError::Auth(_) => "AUTH_ERROR",
             AutomataError::Validation(_) => "VALIDATION_ERROR",
             AutomataError::Config(_) => "CONFIG_ERROR",

@@ -47,6 +47,19 @@ pub enum ExecutionStatus {
     Timeout,
 }
 
+impl std::fmt::Display for ExecutionStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ExecutionStatus::Pending => write!(f, "Pending"),
+            ExecutionStatus::Running => write!(f, "Running"),
+            ExecutionStatus::Completed => write!(f, "Completed"),
+            ExecutionStatus::Failed => write!(f, "Failed"),
+            ExecutionStatus::Cancelled => write!(f, "Cancelled"),
+            ExecutionStatus::Timeout => write!(f, "Timeout"),
+        }
+    }
+}
+
 /// Execution state for persistence
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExecutionState {

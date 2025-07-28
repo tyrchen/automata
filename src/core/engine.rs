@@ -10,7 +10,7 @@ use crate::core::{
 };
 use crate::error::{ExecutionError, Result};
 use crate::nodes::{NodeInput, NodeRegistry};
-use crate::state::StateManager;
+use crate::state::StateManagerTrait;
 use crate::utils::perf::Timer;
 use chrono::Utc;
 use dashmap::DashMap;
@@ -23,10 +23,9 @@ use tracing::{error, info, warn};
 use uuid::Uuid;
 
 /// Core execution engine
-#[derive(Clone)]
 pub struct ExecutionEngine {
     node_registry: Arc<NodeRegistry>,
-    state_manager: Arc<StateManager>,
+    state_manager: Arc<dyn StateManagerTrait>,
     scheduler: Arc<TaskScheduler>,
     running_executions: Arc<DashMap<Uuid, RunningExecution>>,
     config: ExecutionEngineConfig,
@@ -61,7 +60,7 @@ impl ExecutionEngine {
     /// Create a new execution engine
     pub fn new(
         node_registry: Arc<NodeRegistry>,
-        state_manager: Arc<StateManager>,
+        state_manager: Arc<dyn StateManagerTrait>,
         config: ExecutionEngineConfig,
     ) -> Self {
         let scheduler = Arc::new(TaskScheduler::new(config.max_concurrent_nodes));
@@ -530,6 +529,7 @@ mod tests {
     use super::*;
     use crate::core::workflow::{WorkflowMetadata, WorkflowNode};
     use crate::nodes::builtin::HttpNode;
+    use crate::state::StateManager;
     use crate::WorkflowDefinition;
     use serde_json::json;
 

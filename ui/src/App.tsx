@@ -1,35 +1,44 @@
-import { useState } from 'react';
+import { useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { useAppStore } from './stores';
+import AppLayout from './components/layout/AppLayout';
+import Dashboard from './pages/Dashboard';
+import WorkflowList from './pages/WorkflowList';
+import WorkflowEditor from './pages/WorkflowEditor';
+import WorkflowDetail from './pages/WorkflowDetail';
+import ExecutionList from './pages/ExecutionList';
+import ExecutionDetail from './pages/ExecutionDetail';
 
 function App() {
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const { isDarkMode } = useAppStore();
+
+  useEffect(() => {
+    // Apply dark mode class to document
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDarkMode]);
 
   return (
-    <div className={`min-h-screen ${isDarkMode ? 'dark' : ''}`}>
-      <div className="bg-background text-foreground">
-        {/* Hero Section */}
-        <div className="container mx-auto px-4 py-16">
-          <div className="text-center">
-            <h1 className="text-4xl font-bold tracking-tight sm:text-6xl">
-              Welcome to Our Platform
-            </h1>
-            <p className="mt-6 text-lg leading-8 text-muted-foreground">
-              A modern solution for all your needs. Built with React, TypeScript, and Tailwind CSS.
-            </p>
-            <div className="mt-10 flex items-center justify-center gap-x-6">
-              <button
-                onClick={() => setIsDarkMode(!isDarkMode)}
-                className="rounded-md bg-primary px-3.5 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90"
-              >
-                Toggle Theme
-              </button>
-              <a href="#" className="text-sm font-semibold leading-6">
-                Learn more <span aria-hidden="true">→</span>
-              </a>
-            </div>
-          </div>
-        </div>
+    <Router>
+      <div className={`min-h-screen ${isDarkMode ? 'dark' : ''}`}>
+        <Routes>
+          <Route path="/" element={<AppLayout />}>
+            <Route index element={<Dashboard />} />
+            <Route path="workflows" element={<WorkflowList />} />
+            <Route path="workflows/new" element={<WorkflowEditor />} />
+            <Route path="workflows/:id" element={<WorkflowDetail />} />
+            <Route path="workflows/:id/edit" element={<WorkflowEditor />} />
+            <Route path="executions" element={<ExecutionList />} />
+            <Route path="executions/:id" element={<ExecutionDetail />} />
+            <Route path="settings" element={<div className="p-6"><h1>Settings (Coming Soon)</h1></div>} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Route>
+        </Routes>
       </div>
-    </div>
+    </Router>
   );
 }
 

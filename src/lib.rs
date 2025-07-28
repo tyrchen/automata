@@ -16,6 +16,7 @@
 #![allow(clippy::result_large_err)]
 
 pub mod api;
+pub mod config;
 pub mod core;
 pub mod dsl;
 pub mod error;
@@ -36,8 +37,8 @@ pub use crate::nodes::{Node, NodeInput, NodeOutput, NodeRegistry};
 /// Version information
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// Default configuration
-pub mod config {
+/// Default configuration constants
+pub mod defaults {
     pub const DEFAULT_API_PORT: u16 = 8080;
     pub const DEFAULT_WORKER_THREADS: usize = 4;
     pub const DEFAULT_MAX_CONCURRENT_WORKFLOWS: usize = 10000;

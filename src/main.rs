@@ -2,43 +2,68 @@
 
 use automata::{
     api::server::ApiServer,
-    core::engine::{ExecutionEngine, ExecutionEngineConfig},
+    config::AppConfig,
+    core::engine::ExecutionEngine,
     nodes::NodeRegistry,
-    state::StateManager,
-    utils::config,
+    state::{PostgresStateManager, StateManager, StateManagerTrait},
 };
 use std::sync::Arc;
 use tracing::{info, Level};
+use tracing_subscriber::FmtSubscriber;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Load configuration
+    let config = AppConfig::load().unwrap_or_else(|e| {
+        eprintln!("Failed to load configuration: {e}. Using defaults.");
+        AppConfig::default()
+    });
+
     // Initialize logging
-    tracing_subscriber::fmt().with_max_level(Level::INFO).init();
+    let log_level = match config.logging.level.as_str() {
+        "trace" => Level::TRACE,
+        "debug" => Level::DEBUG,
+        "info" => Level::INFO,
+        "warn" => Level::WARN,
+        "error" => Level::ERROR,
+        _ => Level::INFO,
+    };
+
+    let subscriber = FmtSubscriber::builder()
+        .with_max_level(log_level)
+        .with_thread_ids(true)
+        .with_thread_names(true)
+        .finish();
+
+    tracing::subscriber::set_global_default(subscriber).expect("Failed to set tracing subscriber");
 
     info!("Starting Automata Workflow Engine v{}", automata::VERSION);
-
-    // Load configuration
-    let api_port = config::env_var_or_default_int("API_PORT", 8080);
-    let worker_threads = config::env_var_or_default_int("WORKER_THREADS", 4);
-
-    info!(
-        api_port = api_port,
-        worker_threads = worker_threads,
-        "Configuration loaded"
-    );
+    info!("Configuration loaded from config/app.yml");
 
     // Initialize components
     let node_registry = Arc::new(NodeRegistry::new());
-    let state_manager = Arc::new(StateManager::new());
 
-    let engine_config = ExecutionEngineConfig {
-        max_concurrent_executions: 1000,
-        max_concurrent_nodes: 100,
-        default_node_timeout: std::time::Duration::from_secs(30),
-        max_execution_timeout: std::time::Duration::from_secs(300),
-        enable_checkpointing: true,
-        checkpoint_interval: std::time::Duration::from_secs(30),
+    // Initialize state manager based on configuration
+    let state_manager: Arc<dyn StateManagerTrait> = if config.database.url == "memory" {
+        info!("Using in-memory state manager");
+        Arc::new(StateManager::new())
+    } else {
+        info!("Connecting to PostgreSQL database...");
+        match PostgresStateManager::new(&config.database.url).await {
+            Ok(postgres_manager) => {
+                info!("Successfully connected to PostgreSQL");
+                Arc::new(postgres_manager)
+            }
+            Err(e) => {
+                eprintln!(
+                    "Failed to connect to PostgreSQL: {e}. Falling back to in-memory storage."
+                );
+                Arc::new(StateManager::new())
+            }
+        }
     };
+
+    let engine_config = config.to_execution_engine_config();
 
     let execution_engine = Arc::new(ExecutionEngine::new(
         node_registry.clone(),
@@ -78,8 +103,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create and start API server
     let api_server = ApiServer::new(execution_engine, node_registry, state_manager);
 
-    info!(port = api_port, "Starting API server...");
-    api_server.serve(api_port as u16).await?;
+    info!(
+        host = %config.server.host,
+        port = config.server.port,
+        "Starting API server..."
+    );
+
+    info!(
+        "API documentation available at http://{}:{}/swagger-ui/",
+        config.server.host, config.server.port
+    );
+
+    api_server.serve(config.server.port).await?;
 
     Ok(())
 }
