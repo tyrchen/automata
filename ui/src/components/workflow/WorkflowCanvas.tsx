@@ -38,14 +38,12 @@ interface ExecutionProgress {
 
 interface WorkflowCanvasProps {
   onSave?: () => void;
-  onExecute?: () => void;
   readOnly?: boolean;
   executionProgress?: ExecutionProgress | null;
 }
 
 const WorkflowCanvasContent: React.FC<WorkflowCanvasProps> = ({
   onSave,
-  onExecute,
   readOnly = false,
   executionProgress = null,
 }) => {
@@ -247,9 +245,6 @@ const WorkflowCanvasContent: React.FC<WorkflowCanvasProps> = ({
     onSave?.();
   }, [onSave]);
 
-  const handleExecute = useCallback(() => {
-    onExecute?.();
-  }, [onExecute]);
 
   return (
     <div className="w-full h-full relative" ref={dragRef}>
@@ -347,15 +342,6 @@ const WorkflowCanvasContent: React.FC<WorkflowCanvasProps> = ({
               >
                 <Save className="h-4 w-4 mr-1" />
                 {isSaving ? 'Saving...' : 'Save'}
-              </Button>
-              <Button
-                variant="default"
-                size="sm"
-                onClick={handleExecute}
-                className="bg-primary"
-              >
-                <Play className="h-4 w-4 mr-1" />
-                Execute
               </Button>
             </>
           )}

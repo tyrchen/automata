@@ -1,5 +1,6 @@
 import { FlowNode, FlowEdge, WorkflowNode, WorkflowConnection } from '../types';
 import { v4 as uuidv4 } from 'uuid';
+import yaml from 'js-yaml';
 
 interface ParsedWorkflow {
   metadata: {
@@ -49,54 +50,50 @@ function calculateNodePositions(
 
   // Build adjacency list
   const adjacency: Record<string, string[]> = {};
-  const inDegree: Record<string, number> = {};
-
   nodes.forEach(node => {
     adjacency[node] = [];
-    inDegree[node] = 0;
   });
 
   connections.forEach(conn => {
-    if (!adjacency[conn.from]) adjacency[conn.from] = [];
-    adjacency[conn.from].push(conn.to);
-    inDegree[conn.to] = (inDegree[conn.to] || 0) + 1;
-  });
-
-  // Topological sort to determine levels
-  const queue: string[] = [];
-  nodes.forEach(node => {
-    if (inDegree[node] === 0 || node === 'trigger') {
-      queue.push(node);
-      levelMap[node] = 0;
+    if (adjacency[conn.from]) {
+      adjacency[conn.from].push(conn.to);
     }
   });
+
+  // Determine levels using BFS
+  const visited = new Set<string>();
+  const queue = ['trigger'];
+  levelMap['trigger'] = 0;
 
   while (queue.length > 0) {
     const current = queue.shift()!;
-    const currentLevel = levelMap[current];
+    if (visited.has(current)) continue;
+    visited.add(current);
 
-    if (!nodesByLevel[currentLevel]) {
-      nodesByLevel[currentLevel] = [];
+    const level = levelMap[current];
+    if (!nodesByLevel[level]) {
+      nodesByLevel[level] = [];
     }
-    nodesByLevel[currentLevel].push(current);
+    nodesByLevel[level].push(current);
 
-    adjacency[current]?.forEach(neighbor => {
-      inDegree[neighbor]--;
-      if (inDegree[neighbor] === 0) {
-        queue.push(neighbor);
-        levelMap[neighbor] = currentLevel + 1;
-      }
-    });
+    if (adjacency[current]) {
+      adjacency[current].forEach(neighbor => {
+        if (!visited.has(neighbor)) {
+          levelMap[neighbor] = level + 1;
+          queue.push(neighbor);
+        }
+      });
+    }
   }
 
-  // Calculate positions
-  const horizontalSpacing = 250;
-  const verticalSpacing = 150;
+  // Position nodes
+  const horizontalSpacing = 300;
+  const verticalSpacing = 100;
   const startX = 100;
   const startY = 100;
 
-  Object.entries(nodesByLevel).forEach(([level, levelNodes]) => {
-    const levelNum = parseInt(level);
+  Object.entries(nodesByLevel).forEach(([levelStr, levelNodes]) => {
+    const levelNum = parseInt(levelStr);
     const nodesCount = levelNodes.length;
 
     levelNodes.forEach((node, index) => {
@@ -121,8 +118,8 @@ function calculateNodePositions(
 
 export function parseDsl(dslContent: string): ParseResult {
   try {
-    // Parse YAML
-    const parsed = parseYaml(dslContent);
+    // Parse YAML using js-yaml
+    const parsed = yaml.load(dslContent) as ParsedWorkflow;
 
     if (!parsed) {
       return { isValid: false, error: 'Invalid YAML format' };
@@ -231,101 +228,11 @@ export function parseDsl(dslContent: string): ParseResult {
   }
 }
 
-// Simple YAML parser (you might want to use a proper YAML library)
-function parseYaml(content: string): ParsedWorkflow | null {
-  try {
-    // This is a simplified parser. In production, use a proper YAML library
-    const lines = content.split('\n');
-    const result: any = {
-      metadata: {},
-      triggers: [],
-      nodes: {},
-      connections: [],
-    };
-
-    let currentSection = '';
-    let currentNode = '';
-    let currentTrigger = -1;
-    let currentConnection = -1;
-    let indent = 0;
-
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith('#')) continue;
-
-      const currentIndent = line.length - line.trimStart().length;
-
-      // Top level sections
-      if (currentIndent === 0) {
-        if (trimmed === 'metadata:') {
-          currentSection = 'metadata';
-        } else if (trimmed === 'triggers:') {
-          currentSection = 'triggers';
-        } else if (trimmed === 'nodes:') {
-          currentSection = 'nodes';
-        } else if (trimmed === 'connections:') {
-          currentSection = 'connections';
-        }
-      } else {
-        // Handle different sections
-        if (currentSection === 'metadata') {
-          const [key, ...valueParts] = trimmed.split(':');
-          const value = valueParts.join(':').trim().replace(/^["']|["']$/g, '');
-          result.metadata[key.trim()] = value;
-        } else if (currentSection === 'triggers') {
-          if (trimmed.startsWith('- ')) {
-            const triggerType = trimmed.substring(2).replace(':', '');
-            result.triggers.push({ [triggerType]: {} });
-            currentTrigger = result.triggers.length - 1;
-          } else if (currentTrigger >= 0) {
-            const [key, ...valueParts] = trimmed.split(':');
-            const value = valueParts.join(':').trim().replace(/^["']|["']$/g, '');
-            const triggerType = Object.keys(result.triggers[currentTrigger])[0];
-            result.triggers[currentTrigger][triggerType][key.trim()] = value;
-          }
-        } else if (currentSection === 'nodes') {
-          if (currentIndent === 2 && trimmed.endsWith(':')) {
-            currentNode = trimmed.slice(0, -1);
-            result.nodes[currentNode] = {};
-          } else if (currentNode) {
-            const [key, ...valueParts] = trimmed.split(':');
-            const value = valueParts.join(':').trim().replace(/^["']|["']$/g, '');
-
-            if (key.trim() === 'type') {
-              result.nodes[currentNode].type = value;
-            } else if (key.trim() === 'mapping' || key.trim() === 'rules') {
-              result.nodes[currentNode][key.trim()] = {};
-            } else {
-              result.nodes[currentNode][key.trim()] = value;
-            }
-          }
-        } else if (currentSection === 'connections') {
-          if (trimmed.startsWith('- from:')) {
-            const from = trimmed.split(':')[1].trim().replace(/^["']|["']$/g, '');
-            result.connections.push({ from });
-            currentConnection = result.connections.length - 1;
-          } else if (currentConnection >= 0) {
-            const [key, ...valueParts] = trimmed.split(':');
-            const value = valueParts.join(':').trim().replace(/^["']|["']$/g, '');
-            result.connections[currentConnection][key.trim()] = value;
-          }
-        }
-      }
-    }
-
-    return result as ParsedWorkflow;
-  } catch (error) {
-    console.error('YAML parse error:', error);
-    return null;
-  }
-}
-
 export function validateWorkflowDsl(dsl: string): { isValid: boolean; errors: string[] } {
   const errors: string[] = [];
 
   try {
-    const parsed = parseYaml(dsl);
-
+    const parsed = yaml.load(dsl) as ParsedWorkflow;
     if (!parsed) {
       errors.push('Invalid YAML format');
       return { isValid: false, errors };
@@ -333,10 +240,10 @@ export function validateWorkflowDsl(dsl: string): { isValid: boolean; errors: st
 
     // Validate metadata
     if (!parsed.metadata?.name) {
-      errors.push('metadata.name is required');
+      errors.push('Metadata must include a name');
     }
     if (!parsed.metadata?.version) {
-      errors.push('metadata.version is required');
+      errors.push('Metadata must include a version');
     }
 
     // Validate triggers
@@ -345,7 +252,7 @@ export function validateWorkflowDsl(dsl: string): { isValid: boolean; errors: st
     }
 
     // Validate nodes
-    if (!parsed.nodes || Object.keys(parsed.nodes).length === 0) {
+    if (!parsed.nodes || typeof parsed.nodes !== 'object' || Object.keys(parsed.nodes).length === 0) {
       errors.push('At least one node is required');
     }
 
@@ -434,64 +341,46 @@ export function generateWorkflowDsl(nodes: FlowNode[], edges: FlowEdge[]): strin
   });
 
   // Convert to YAML-like string
-  let yaml = '';
+  let yamlOutput = '';
 
   // Metadata
-  yaml += 'metadata:\n';
-  yaml += `  name: "${workflow.metadata.name}"\n`;
-  yaml += `  version: "${workflow.metadata.version}"\n`;
-  yaml += `  description: "${workflow.metadata.description}"\n\n`;
+  yamlOutput += 'metadata:\n';
+  yamlOutput += `  name: "${workflow.metadata.name}"\n`;
+  yamlOutput += `  version: "${workflow.metadata.version}"\n`;
+  yamlOutput += `  description: "${workflow.metadata.description}"\n\n`;
 
   // Triggers
-  yaml += 'triggers:\n';
+  yamlOutput += 'triggers:\n';
   workflow.triggers.forEach((trigger: any) => {
     const triggerType = Object.keys(trigger)[0];
-    yaml += `  - ${triggerType}:`;
-
-    const config = trigger[triggerType];
-    if (Object.keys(config).length === 0) {
-      yaml += ' {}\n';
-    } else {
-      yaml += '\n';
-      Object.entries(config).forEach(([key, value]) => {
-        yaml += `      ${key}: ${JSON.stringify(value)}\n`;
-      });
-    }
+    yamlOutput += `  - ${triggerType}: {}\n`;
   });
-  yaml += '\n';
+  yamlOutput += '\n';
 
   // Nodes
-  yaml += 'nodes:\n';
-  Object.entries(workflow.nodes).forEach(([nodeId, node]: [string, any]) => {
-    yaml += `  ${nodeId}:\n`;
-    yaml += `    type: ${node.type}\n`;
+  yamlOutput += 'nodes:\n';
+  Object.entries(workflow.nodes).forEach(([nodeId, nodeConfig]: [string, any]) => {
+    yamlOutput += `  ${nodeId}:\n`;
+    yamlOutput += `    type: ${nodeConfig.type}\n`;
 
-    Object.entries(node).forEach(([key, value]) => {
+    // Add other node properties
+    Object.entries(nodeConfig).forEach(([key, value]) => {
       if (key !== 'type') {
-        if (typeof value === 'object' && value !== null) {
-          yaml += `    ${key}:\n`;
-          Object.entries(value).forEach(([subKey, subValue]) => {
-            yaml += `      ${subKey}: ${JSON.stringify(subValue)}\n`;
-          });
-        } else {
-          yaml += `    ${key}: ${JSON.stringify(value)}\n`;
-        }
+        yamlOutput += `    ${key}: ${JSON.stringify(value)}\n`;
       }
     });
-    yaml += '\n';
   });
+  yamlOutput += '\n';
 
   // Connections
-  if (workflow.connections.length > 0) {
-    yaml += 'connections:\n';
-    workflow.connections.forEach((conn: any) => {
-      yaml += `  - from: ${conn.from}\n`;
-      yaml += `    to: ${conn.to}\n`;
-      if (conn.condition) {
-        yaml += `    condition: ${conn.condition}\n`;
-      }
-    });
-  }
+  yamlOutput += 'connections:\n';
+  workflow.connections.forEach((conn: any) => {
+    yamlOutput += `  - from: ${conn.from}\n`;
+    yamlOutput += `    to: ${conn.to}\n`;
+    if (conn.condition) {
+      yamlOutput += `    condition: ${conn.condition}\n`;
+    }
+  });
 
-  return yaml;
+  return yamlOutput;
 }

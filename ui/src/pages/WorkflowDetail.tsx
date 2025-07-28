@@ -51,30 +51,17 @@ const WorkflowDetail: React.FC = () => {
             setWorkflowName(response.data.metadata.name);
             setWorkflowDescription(response.data.metadata.description || '');
 
-            // Generate DSL from loaded workflow
-            if (response.data.nodes && Object.keys(response.data.nodes).length > 0) {
-              const flowNodes = Object.entries(response.data.nodes).map(([id, node]) => ({
-                id,
-                data: {
-                  label: node.node_type,
-                  nodeType: node.node_type,
-                  config: node.config,
-                },
-                type: 'workflowNode',
-                position: node.position || { x: 100, y: 100 },
-                ...node,
-              })) as any[];
+            // Use the raw definition from the API response
+            if (response.data.definition) {
+              setDslContent(response.data.definition);
+              validateDsl(response.data.definition);
 
-              const flowEdges = response.data.connections.map(conn => ({
-                id: `${conn.from}-${conn.to}`,
-                source: conn.from,
-                target: conn.to,
-                ...conn
-              })) as any[];
-
-              const generatedDsl = generateWorkflowDsl(flowNodes, flowEdges);
-              setDslContent(generatedDsl);
-              validateDsl(generatedDsl);
+              // Also parse the DSL to populate the visual editor
+              const result = parseDsl(response.data.definition);
+              if (result.isValid && result.nodes && result.edges) {
+                setNodes(result.nodes);
+                setEdges(result.edges);
+              }
             }
           }
         } catch (error) {
@@ -321,7 +308,6 @@ const WorkflowDetail: React.FC = () => {
               <div className="flex-1 relative">
                 <WorkflowCanvas
                   onSave={handleSave}
-                  onExecute={handleExecute}
                   readOnly={false}
                 />
               </div>
