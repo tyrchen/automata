@@ -1,0 +1,165 @@
+// Pest grammar for workflow DSL parsing
+WHITESPACE = _{ " " | "\t" | "\n" | "\r" }
+COMMENT = _{ "#" ~ (!"\n" ~ ANY)* }
+
+// Main workflow structure
+workflow = { SOI ~ yaml_document ~ EOI }
+yaml_document = { metadata? ~ triggers? ~ nodes? ~ connections? ~ tests? }
+
+// Metadata section
+metadata = { "@metadata" ~ ":" ~ metadata_object }
+metadata_object = { "{" ~ metadata_pairs? ~ "}" }
+metadata_pairs = { metadata_pair ~ ("," ~ metadata_pair)* }
+metadata_pair = { key ~ ":" ~ value }
+
+// Triggers section
+triggers = { "triggers" ~ ":" ~ "[" ~ trigger_list? ~ "]" }
+trigger_list = { trigger ~ ("," ~ trigger)* }
+trigger = { trigger_type ~ ":" ~ trigger_config }
+trigger_type = { "webhook" | "schedule" | "event" | "manual" }
+trigger_config = { "{" ~ config_pairs? ~ "}" }
+
+// Nodes section
+nodes = { "nodes" ~ ":" ~ "{" ~ node_list? ~ "}" }
+node_list = { node_entry ~ ("," ~ node_entry)* }
+node_entry = { node_id ~ ":" ~ node_definition }
+node_id = { identifier }
+node_definition = { "{" ~ node_pairs ~ "}" }
+node_pairs = { node_pair ~ ("," ~ node_pair)* }
+node_pair = { node_key ~ ":" ~ value }
+node_key = { "type" | "input" | "config" | "condition" | "timeout" | "retry" | identifier }
+
+// Connections section
+connections = { "connections" ~ ":" ~ "[" ~ connection_list? ~ "]" }
+connection_list = { connection ~ ("," ~ connection)* }
+connection = { "{" ~ connection_pairs ~ "}" }
+connection_pairs = { connection_pair ~ ("," ~ connection_pair)* }
+connection_pair = { connection_key ~ ":" ~ value }
+connection_key = { "from" | "to" | "condition" | "label" }
+
+// Tests section
+tests = { "@test" ~ ":" ~ "[" ~ test_list? ~ "]" }
+test_list = { test_case ~ ("," ~ test_case)* }
+test_case = { "{" ~ test_pairs ~ "}" }
+test_pairs = { test_pair ~ ("," ~ test_pair)* }
+test_pair = { test_key ~ ":" ~ value }
+test_key = { "name" | "input" | "mock" | "expect" }
+
+// Configuration pairs
+config_pairs = { config_pair ~ ("," ~ config_pair)* }
+config_pair = { key ~ ":" ~ value }
+
+// Basic types
+key = { identifier | string_literal }
+value = {
+    expression |
+    object |
+    array |
+    string_literal |
+    number |
+    boolean |
+    null
+}
+
+// Expressions (our custom DSL extension)
+expression = {
+    function_call |
+    variable_reference |
+    arithmetic_expression
+}
+
+// Variable references: $trigger.body, $node.data, etc.
+variable_reference = { "$" ~ variable_path }
+variable_path = { identifier ~ ("." ~ (identifier | array_index))* }
+array_index = { "[" ~ number ~ "]" }
+
+// Function calls: $now(), $hash(value), $uuid(), etc.
+function_call = { "$" ~ function_name ~ "(" ~ function_args? ~ ")" }
+function_name = { identifier }
+function_args = { simple_expression ~ ("," ~ simple_expression)* }
+
+// Simple expressions (non-recursive)
+simple_expression = {
+    function_call |
+    variable_reference |
+    string_literal |
+    number |
+    boolean |
+    null
+}
+
+// Arithmetic expressions: +, -, *, /, %
+arithmetic_expression = { term ~ (arithmetic_op ~ term)* }
+term = { factor ~ (factor_op ~ factor)* }
+factor = { "(" ~ arithmetic_expression ~ ")" | number | variable_reference }
+arithmetic_op = { "+" | "-" }
+factor_op = { "*" | "/" | "%" }
+
+// Comparison and logical operators
+comparison_op = { ">=" | "<=" | ">" | "<" | "==" | "!=" }
+logical_op = { "and" | "or" | "not" }
+
+// Object and array literals
+object = { "{" ~ object_pairs? ~ "}" }
+object_pairs = { object_pair ~ ("," ~ object_pair)* }
+object_pair = { key ~ ":" ~ value }
+
+array = { "[" ~ array_values? ~ "]" }
+array_values = { value ~ ("," ~ value)* }
+
+// Primitive types
+string_literal = { "\"" ~ string_content ~ "\"" | "'" ~ string_content_single ~ "'" }
+string_content = { (!("\"") ~ ANY)* }
+string_content_single = { (!("'") ~ ANY)* }
+
+number = {
+    "-"? ~ (
+        "0" |
+        (ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*) ~ ("." ~ ASCII_DIGIT+)? ~
+        (("e" | "E") ~ ("+" | "-")? ~ ASCII_DIGIT+)?
+    )
+}
+
+boolean = { "true" | "false" }
+null = { "null" }
+
+// Identifiers
+identifier = { (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_" | "-")* }
+
+// YAML-specific constructs
+yaml_key = { identifier | string_literal }
+yaml_scalar = { string_literal | number | boolean | null | expression }
+yaml_sequence = { "-" ~ yaml_value }
+yaml_mapping = { yaml_key ~ ":" ~ yaml_value }
+yaml_value = { yaml_mapping | yaml_sequence | yaml_scalar }
+
+// Multiline strings (YAML pipe and fold)
+multiline_literal = { "|" ~ multiline_content }
+multiline_folded = { ">" ~ multiline_content }
+multiline_content = { (!("\n" ~ yaml_key ~ ":") ~ ANY)* }
+
+// Special YAML values
+yaml_null = { "~" | "null" | "Null" | "NULL" }
+yaml_bool = { "true" | "True" | "TRUE" | "false" | "False" | "FALSE" | "yes" | "Yes" | "YES" | "no" | "No" | "NO" }
+
+// Node types (built-in)
+node_type = {
+    "http" |
+    "database_query" |
+    "database_insert" |
+    "database_update" |
+    "database_delete" |
+    "validator" |
+    "transformer" |
+    "conditional" |
+    "switch" |
+    "foreach" |
+    "parallel" |
+    "wait" |
+    "email" |
+    "webhook" |
+    "file" |
+    "response" |
+    "log" |
+    "custom"
+}
